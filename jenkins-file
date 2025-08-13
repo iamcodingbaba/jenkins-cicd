@@ -1,5 +1,11 @@
 pipeline {
     agent { label 'jenkins-slave' }
+
+    environment {
+        AWS_REGION = "us-east-1"
+        CLUSTER_NAME = "my-cluster"
+    }
+
     stages {
         stage('Check & Clone Repo') {
             steps {
@@ -12,25 +18,29 @@ pipeline {
                 }
             }
         }
+
         stage('Install AWS CLI if Missing') {
-    steps {
-        script {
-            if (sh(script: 'command -v aws >/dev/null 2>&1', returnStatus: true) != 0) {
-                echo "AWS CLI not found. Installing..."
-                sh '''
-                  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-                  unzip awscliv2.zip
-                  sudo ./aws/install
-                '''
-            } else {
-                echo "AWS CLI already installed. Updating..."
-                sh '''
-                  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-                  unzip -o awscliv2.zip
-                  sudo ./aws/install --update
-                '''
+            steps {
+                script {
+                    if (sh(script: 'command -v aws >/dev/null 2>&1', returnStatus: true) != 0) {
+                        echo "AWS CLI not found. Installing..."
+                        sh '''
+                          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                          unzip awscliv2.zip
+                          sudo ./aws/install
+                        '''
+                    } else {
+                        echo "AWS CLI already installed. Updating..."
+                        sh '''
+                          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                          unzip -o awscliv2.zip
+                          sudo ./aws/install --update
+                        '''
+                    }
+                }
             }
         }
+
         stage('Install kubectl if Missing') {
             steps {
                 sh '''
@@ -45,15 +55,19 @@ pipeline {
                 '''
             }
         }
+
         stage('AWS CLI Config') {
             steps {
-                sh '''
-                aws configure set aws_access_key_id $AWS_CREDENTIALS_USR
-                aws configure set aws_secret_access_key $AWS_CREDENTIALS_PSW
-                aws configure set region $AWS_REGION
-                '''
+                withCredentials([usernamePassword(credentialsId: 'aws-jenkins-creds', usernameVariable: 'AWS_CREDENTIALS_USR', passwordVariable: 'AWS_CREDENTIALS_PSW')]) {
+                    sh '''
+                    aws configure set aws_access_key_id $AWS_CREDENTIALS_USR
+                    aws configure set aws_secret_access_key $AWS_CREDENTIALS_PSW
+                    aws configure set region $AWS_REGION
+                    '''
+                }
             }
         }
+
         stage('Configure EKS') {
             steps {
                 sh '''
@@ -61,6 +75,7 @@ pipeline {
                 '''
             }
         }
+
         stage('Delete Existing Vote App') {
             steps {
                 dir('k8s') {
@@ -72,6 +87,7 @@ pipeline {
                 }
             }
         }
+
         stage('Deploy Vote App') {
             steps {
                 dir('k8s') {
@@ -79,11 +95,13 @@ pipeline {
                 }
             }
         }
+
         stage('Wait 30 Seconds') {
             steps {
                 sh 'sleep 30'
             }
         }
+
         stage('Delete Existing Result App') {
             steps {
                 dir('k8s') {
@@ -95,6 +113,7 @@ pipeline {
                 }
             }
         }
+
         stage('Deploy Result App') {
             steps {
                 dir('k8s') {
@@ -103,5 +122,4 @@ pipeline {
             }
         }
     }
-}
 }
