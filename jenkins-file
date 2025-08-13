@@ -1,1 +1,106 @@
-aws eks update-kubeconfig --name my-cluster --region us-east-1
+pipeline {
+    agent { label 'jenkins-slave' }
+    environment {
+        AWS_REGION = 'us-east-1'
+        CLUSTER_NAME = 'my-cluster'
+        AWS_CREDENTIALS = credentials('aws-jenkins-creds') // Jenkins credentials ID
+    }
+    stages {
+        stage('Check & Clone Repo') {
+            steps {
+                script {
+                    if (!fileExists('k8s')) {
+                        sh 'git clone https://github.com/iamcodingbaba/k8s.git'
+                    } else {
+                        echo "Repo already exists, skipping clone"
+                    }
+                }
+            }
+        }
+        stage('Install AWS CLI if Missing') {
+            steps {
+                sh '''
+                if ! command -v aws &> /dev/null; then
+                    echo "AWS CLI not found. Installing..."
+                    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                    unzip awscliv2.zip
+                    sudo ./aws/install
+                else
+                    echo "AWS CLI already installed"
+                fi
+                '''
+            }
+        }
+        stage('Install kubectl if Missing') {
+            steps {
+                sh '''
+                if ! command -v kubectl &> /dev/null; then
+                    echo "kubectl not found. Installing..."
+                    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                    chmod +x kubectl
+                    sudo mv kubectl /usr/local/bin/
+                else
+                    echo "kubectl already installed"
+                fi
+                '''
+            }
+        }
+        stage('AWS CLI Config') {
+            steps {
+                sh '''
+                aws configure set aws_access_key_id $AWS_CREDENTIALS_USR
+                aws configure set aws_secret_access_key $AWS_CREDENTIALS_PSW
+                aws configure set region $AWS_REGION
+                '''
+            }
+        }
+        stage('Configure EKS') {
+            steps {
+                sh '''
+                aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
+                '''
+            }
+        }
+        stage('Delete Existing Vote App') {
+            steps {
+                dir('k8s') {
+                    sh '''
+                    if kubectl get deployment vote-app &> /dev/null; then
+                        kubectl delete -f vote-app-no-result.yaml || true
+                    fi
+                    '''
+                }
+            }
+        }
+        stage('Deploy Vote App') {
+            steps {
+                dir('k8s') {
+                    sh 'kubectl apply -f vote-app-no-result.yaml'
+                }
+            }
+        }
+        stage('Wait 30 Seconds') {
+            steps {
+                sh 'sleep 30'
+            }
+        }
+        stage('Delete Existing Result App') {
+            steps {
+                dir('k8s') {
+                    sh '''
+                    if kubectl get deployment result &> /dev/null; then
+                        kubectl delete -f result.yaml || true
+                    fi
+                    '''
+                }
+            }
+        }
+        stage('Deploy Result App') {
+            steps {
+                dir('k8s') {
+                    sh 'kubectl apply -f result.yaml'
+                }
+            }
+        }
+    }
+}
