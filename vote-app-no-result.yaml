@@ -4,7 +4,7 @@ kind: Deployment
 metadata:
   name: vote
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       batch: demo
@@ -48,7 +48,7 @@ kind: Deployment
 metadata:
   name: redis
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       batch: redis
@@ -87,7 +87,7 @@ kind: Deployment
 metadata:
   name: work
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       batch: work
@@ -120,7 +120,7 @@ kind: Deployment
 metadata:
   name: db
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       batch: db
