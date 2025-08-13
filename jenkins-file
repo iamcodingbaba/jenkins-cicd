@@ -1,5 +1,6 @@
 pipeline {
     agent { label 'jenkins-slave' }
+
     stages {
         stage('Check & Clone Repo') {
             steps {
@@ -33,31 +34,17 @@ pipeline {
                 sh '''
                 if ! command -v aws &> /dev/null; then
                     echo "AWS CLI not found. Installing..."
+                    sudo apt-get update -y
                     sudo apt-get install -y unzip
                     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-                    unzip awscliv2.zip
-                    sudo ./aws/install
+                    unzip -o awscliv2.zip
+                    sudo ./aws/install --update
                 else
                     echo "AWS CLI already installed"
                 fi
                 '''
             }
         }
-
-        stage('AWS CLI Config') {
-            steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withCredentials([usernamePassword(credentialsId: 'aws-jenkins-creds', usernameVariable: 'AWS_CREDENTIALS_USR', passwordVariable: 'AWS_CREDENTIALS_PSW')]) {
-                        sh '''
-                        aws configure set aws_access_key_id $AWS_CREDENTIALS_USR
-                        aws configure set aws_secret_access_key $AWS_CREDENTIALS_PSW
-                        aws configure set region us-east-1
-                        '''
-                    }
-                }
-            }
-        }
-
         stage('Configure EKS') {
             steps {
                 sh '''
