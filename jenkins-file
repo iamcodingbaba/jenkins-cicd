@@ -1,11 +1,5 @@
 pipeline {
     agent { label 'jenkins-slave' }
-
-    environment {
-        AWS_REGION = "us-east-1"
-        CLUSTER_NAME = "my-cluster"
-    }
-
     stages {
         stage('Check & Clone Repo') {
             steps {
